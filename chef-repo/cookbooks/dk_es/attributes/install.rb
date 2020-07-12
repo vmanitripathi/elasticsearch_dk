@@ -11,4 +11,4 @@ default["dk_es"]["nodename"]="dk_es_node"
 default["dk_es"]["jvm"]["xms"] = "128m"
 default["dk_es"]["jvm"]["xmx"] = "128m"
 default["dk_es"]["http"]["port"]=9200
-default["dk_es"]["ec2"]["name"]="ES_POC"
+default["dk_es"]["ec2"]["name"]="Elasticsearch-7-EC2"

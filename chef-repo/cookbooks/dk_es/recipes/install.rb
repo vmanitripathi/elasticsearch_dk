@@ -19,13 +19,16 @@ es_install = bash "download_and_install_elasticsearch" do
     nodename: "#{node["dk_es"]["nodename"]}-#{node["ipaddress"]}",
     nodemaster: node["dk_es"]["node"]["data"]['master'],
     nodedata: node["dk_es"]["node"]["data"],
-    networkhost: node["dk_es"]["network"]["host"],
+    networkhost: node["ipaddress"],
     datadirectory:node["dk_es"]["directory"]["data"],
     logdirectory: node["dk_es"]["directory"]["log"],
     elasticsearchport: node["dk_es"]["http"]["port"],
     isSecurityEnabled: node["dk_es"]["security"]["enabled"],
     isHttpsEnabled: node["dk_es"]["security"]["http"]["ssl"]["enabled"],
-    keystorepath: node["dk_es"]["security"]["http"]["ssl"]["kestore"]["path"]
+    keystorepath: node["dk_es"]["security"]["http"]["ssl"]["kestore"]["path"],
+    ec2tagvalue: node["dk_es"]["ec2"]["name"],
+    initmasternode: node["ipaddress"],
+    transportstorepath: node["dk_es"]["security"]["transport"]["ssl"]["kestore"]["path"]
   )
 end
 
@@ -45,14 +48,45 @@ add_user = bash "adding es authorised user" do
     code <<-EOH
     /usr/share/elasticsearch/bin/elasticsearch-users useradd #{node["dk_es"]["auth"]["user"]["name"]} -p #{node["dk_es"]["auth"]["user"]["password"]} -r #{node["dk_es"]["auth"]["user"]["group"]}
       EOH
+    #  not_if { ::File.exist?("/etc/elasticsearch/users" )}
   end
   Chef::Log.info "Added elasticsearch superuser" if add_user.updated_by_last_action?
+
+  install_discovery_plugin = bash "installing discovery plugin" do
+    code <<-EOH
+    yes Y | /usr/share/elasticsearch/bin/elasticsearch-plugin install discovery-ec2
+      EOH
+  end
+  Chef::Log.info "Added elasticsearch superuser" if install_discovery_plugin.updated_by_last_action?
 
 cookbook_file "#{node["dk_es"]["directory"]["conf"]}#{node["dk_es"]["security"]["http"]["ssl"]["kestore"]["path"]}" do
 	source "#{node["dk_es"]["security"]["http"]["ssl"]["kestore"]["path"]}"
 	mode '0755'
 	action :create
 end
+
+cookbook_file "#{node["dk_es"]["directory"]["conf"]}#{node["dk_es"]["security"]["transport"]["ssl"]["kestore"]["path"]}" do
+	source "#{node["dk_es"]["security"]["transport"]["ssl"]["kestore"]["path"]}"
+	mode '0755'
+	action :create
+end
+
+cookbook_file "#{node["dk_es"]["directory"]["conf"]}find_master.py" do
+	source "find_master.py"
+	mode '0755'
+	action :create
+end
+
+update_config = bash "adding es authorised user" do
+  code <<-EOH
+    sudo apt-get install -y python3-pip
+    pip3 install boto3
+    python3 /etc/elasticsearch/find_master.py
+  EOH
+  #  not_if { ::File.exist?("/etc/elasticsearch/users" )}
+end
+Chef::Log.info "Added elasticsearch superuser" if update_config.updated_by_last_action?
+
 
 service 'elasticsearch' do
     action :start

@@ -1,4 +1,4 @@
-#Installing elasticsearch certificate
+#Installing elasticsearch software
 es_install = bash "download_and_install_elasticsearch" do
     code <<-EOH
     wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -

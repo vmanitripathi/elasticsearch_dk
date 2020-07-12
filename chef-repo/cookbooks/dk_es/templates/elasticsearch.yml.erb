@@ -47,9 +47,9 @@ xpack.security.enabled: <%=@isSecurityEnabled%>
 xpack.security.transport.ssl.enabled: <%=@isHttpsEnabled%>
 xpack.security.http.ssl.enabled: <%=@isHttpsEnabled%>
 xpack.security.http.ssl.keystore.path: "<%=@keystorepath%>"
-xpack.security.transport.ssl.verification_mode: certificate
-xpack.security.transport.ssl.keystore.path: elastic-certificates.p12
-xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+xpack.security.transport.ssl.verification_mode: <%=@transportverificatiomode%>
+xpack.security.transport.ssl.keystore.path: "<%=@transportstorepath%>"
+xpack.security.transport.ssl.truststore.path: "<%=@transportstorepath%>"
 xpack:
   security:
     authc:

@@ -84,12 +84,6 @@ cookbook_file "#{node["dk_es"]["directory"]["conf"]}#{node["dk_es"]["security"][
 	action :create
 end
 
-#cookbook_file "#{node["dk_es"]["directory"]["conf"]}find_master.py" do
-#	source "find_master.py"
-#	mode '0755'
-#	action :create
-#end
-
 
 # Adding custom script to discover master nodes in runtime
 template "#{node["dk_es"]["directory"]["conf"]}" + "/find_master.py" do

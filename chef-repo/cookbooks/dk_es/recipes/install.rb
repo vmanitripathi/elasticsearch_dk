@@ -50,14 +50,14 @@ add_user = bash "adding es authorised user" do
       EOH
     #  not_if { ::File.exist?("/etc/elasticsearch/users" )}
   end
-  Chef::Log.info "Added elasticsearch superuser" if add_user.updated_by_last_action?
+  Chef::Log.info "added es authorised user" if add_user.updated_by_last_action?
 
-  install_discovery_plugin = bash "installing discovery plugin" do
+  install_discovery_plugin = bash "installing ec2 discovery plugin" do
     code <<-EOH
     yes Y | /usr/share/elasticsearch/bin/elasticsearch-plugin install discovery-ec2
       EOH
   end
-  Chef::Log.info "Added elasticsearch superuser" if install_discovery_plugin.updated_by_last_action?
+  Chef::Log.info "added ec2 discovery plugin" if install_discovery_plugin.updated_by_last_action?
 
 cookbook_file "#{node["dk_es"]["directory"]["conf"]}#{node["dk_es"]["security"]["http"]["ssl"]["kestore"]["path"]}" do
 	source "#{node["dk_es"]["security"]["http"]["ssl"]["kestore"]["path"]}"
@@ -77,7 +77,7 @@ cookbook_file "#{node["dk_es"]["directory"]["conf"]}find_master.py" do
 	action :create
 end
 
-update_config = bash "adding es authorised user" do
+update_config = bash "updating elasticsearch master node ip" do
   code <<-EOH
     sudo apt-get install -y python3-pip
     pip3 install boto3
@@ -85,7 +85,7 @@ update_config = bash "adding es authorised user" do
   EOH
   #  not_if { ::File.exist?("/etc/elasticsearch/users" )}
 end
-Chef::Log.info "Added elasticsearch superuser" if update_config.updated_by_last_action?
+Chef::Log.info "updated elasticsearch master node ip" if update_config.updated_by_last_action?
 
 
 service 'elasticsearch' do

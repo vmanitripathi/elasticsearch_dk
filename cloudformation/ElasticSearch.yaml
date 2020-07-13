@@ -160,7 +160,7 @@ Resources:
                         sudo apt update
                         sudo apt install -y git
                         cd /home/ubuntu
-                        git clone https://github.com/vmanitripathi/elasticsearch_dk.git -b elasticsearch
+                        git clone https://github.com/vmanitripathi/elasticsearch_dk.git -b develop
                         cd elasticsearch_dk/chef-repo
                         sudo chef-solo -c /home/ubuntu/elasticsearch_dk/chef-repo/solo.rb -j /home/ubuntu/elasticsearch_dk/chef-repo/install_es.rb --chef-license accept
                         /opt/aws/bin/cfn-signal --exit-code $? --stack  ${AWS::StackName} --resource AutoScalingGroup  --region ${AWS::Region}

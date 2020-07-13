@@ -1,0 +1,59 @@
+
+# Use a descriptive name for your cluster:
+#
+cluster.name: "<%=@clustername%>"
+#
+# ------------------------------------ Node ------------------------------------
+#
+# Use a descriptive name for the node:
+#
+node.name: "<%=@nodename%>"
+
+# ----------------------------------- Paths ------------------------------------
+#
+# Path to directory where to store the data (separate multiple locations by comma):
+#
+path.data: "<%=@datadirectory%>"
+#
+# Path to log files:
+#
+path.logs: "<%=@logdirectory%>"
+#
+
+#
+# ---------------------------------- Network -----------------------------------
+#
+# Set the bind address to a specific IP (IPv4 or IPv6):
+#
+network.host: <%=@networkhost%>
+#
+# Set a custom port for HTTP:
+#
+http.port: <%=@elasticsearchport%>
+#
+
+# --------------------------------- Discovery ----------------------------------
+#
+discovery.ec2.tag.Name: <%=@ec2tagvalue%>
+discovery.zen.hosts_provider: ec2
+discovery.ec2.any_group: true
+discovery.ec2.host_type: private_ip
+discovery.ec2.endpoint: ec2.us-east-1.amazonaws.com
+cluster.initial_master_nodes: ["<%=@initmasternode%>"]
+#
+# ---------------------------------- Security -----------------------------------
+
+xpack.security.enabled: <%=@isSecurityEnabled%>
+xpack.security.transport.ssl.enabled: <%=@isHttpsEnabled%>
+xpack.security.http.ssl.enabled: <%=@isHttpsEnabled%>
+xpack.security.http.ssl.keystore.path: "<%=@keystorepath%>"
+xpack.security.transport.ssl.verification_mode: <%=@transportverificatiomode%>
+xpack.security.transport.ssl.keystore.path: "<%=@transportstorepath%>"
+xpack.security.transport.ssl.truststore.path: "<%=@transportstorepath%>"
+xpack:
+  security:
+    authc:
+      realms:
+        file:
+          file1:
+            order: 0            

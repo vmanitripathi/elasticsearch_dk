@@ -1,0 +1,221 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: ElasticSearch Infrastructure Setup CFN
+
+Parameters:
+    Name:
+        Type: String
+        Description: Name tag for the EC2 Instances
+        Default: "ElasticSearch-7"
+    AMIID:
+        Description: This AMI Id will be used to launch EC2 Servers 
+        Type: AWS::EC2::Image::Id
+        Default: 'ami-0ac80df6eff0e70b5'
+    VPCId:
+        Description: This will be the VPC ID where Elasticsearch will be deployed
+        Type: AWS::EC2::VPC::Id 
+    PublicSubnets:
+        Description: "Please specify atleast two public subnets in your vpc"
+        Type: List<AWS::EC2::Subnet::Id>
+    ApplicationSubnets:
+        Description: "Please specify atleast two private subnets in your vpc"
+        Type: List<AWS::EC2::Subnet::Id> 
+    KeyPair:
+        Description: "Please specify the key pair for your ec2 instance"
+        Type: AWS::EC2::KeyPair::KeyName
+    Region:
+        Description: "Please specify the Region you want to deploy this Infrastructure to"
+        Type: String
+    InstanceType:
+        Description: "Choose the desired EC2 instance type"
+        Type: String
+        AllowedValues: ["t2.micro","c5.large"]
+    OwnersEmail:
+        Description: "The Email Address of the person who owns this activity"
+        Type: String
+    Version: 
+        Description: Please specify version of your elasticsearch cluster
+        Type: String
+    DesiredCapacity:
+        Description: Please specify the desired capacity for AutoScaling Group
+        Type: Number
+    MaximumCapacity:
+        Description: Please specify the maximum capacity for AutoScaling Group
+        Type: Number
+    MinimumCapacity:
+        Description: Please specify the minimum capacity for AutoScaling Group
+        Type: Number
+      
+    
+
+Resources:
+
+    IAMRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Join [ "-" , [ !Ref Name, "IAM-Role"]]
+            MaxSessionDuration: 3600
+            Path: "/"
+            AssumeRolePolicyDocument: 
+                Version: '2012-10-17'
+                Statement:
+                - Effect: Allow
+                  Principal:
+                    Service:
+                      - ec2.amazonaws.com
+                  Action: sts:AssumeRole
+            Description: !Ref Name
+            ManagedPolicyArns: 
+                - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+                - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+
+    RootInstanceProfile: 
+        DependsOn: IAMRole
+        Type: "AWS::IAM::InstanceProfile"
+        Properties: 
+            Path: "/"
+            Roles: 
+                - !Ref IAMRole
+                   
+    Ec2SecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupName: !Join [ "-" , [ !Ref Name, "EC2-SG"]]
+            GroupDescription: "This Security Group will allows the desired access to Elaticsearch Servers"
+            VpcId: !Ref VPCId
+            Tags:
+            - Key: "Name"
+              Value: !Join [ "-" , [ !Ref Name,  "EC2-SG"]]
+    
+    ELBSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupName: !Join [ "-" , [ !Ref Name, "ELB-SG"]]
+            GroupDescription: "This Security Group will allows the access to ElasticSearch LoadBalancer"
+            VpcId: !Ref VPCId
+            SecurityGroupIngress:
+            - IpProtocol: -1
+              FromPort: -1
+              ToPort: -1
+              CidrIp: 0.0.0.0/0
+            Tags:
+            - Key: "Name"
+              Value: !Join [ "-" , [ !Ref Name, "ELB-SG"] ]
+    
+    EC2SecurityGroupIngress:
+        Type: AWS::EC2::SecurityGroupIngress
+        DependsOn: 
+        - ELBSecurityGroup
+        - Ec2SecurityGroup
+        Properties:
+            IpProtocol: tcp
+            FromPort: 9200
+            ToPort: 9400
+            SourceSecurityGroupId: !GetAtt ELBSecurityGroup.GroupId
+            GroupId: !GetAtt Ec2SecurityGroup.GroupId
+    
+    EC2SelfSecurityGroupIngress:
+        Type: AWS::EC2::SecurityGroupIngress
+        DependsOn: 
+        - Ec2SecurityGroup
+        Properties:
+            IpProtocol: tcp
+            FromPort: 9200
+            ToPort: 9400
+            SourceSecurityGroupId: !GetAtt Ec2SecurityGroup.GroupId
+            GroupId: !GetAtt Ec2SecurityGroup.GroupId
+    
+    ELBSecurityGroupEgress:
+        Type: AWS::EC2::SecurityGroupEgress
+        DependsOn: 
+        - ELBSecurityGroup
+        - Ec2SecurityGroup
+        Properties:
+            IpProtocol: -1
+            FromPort: -1
+            ToPort: -1
+            SourceSecurityGroupId: !GetAtt Ec2SecurityGroup.GroupId
+            GroupId: !GetAtt ELBSecurityGroup.GroupId
+
+    LaunchConfiguration:
+        Type: AWS::AutoScaling::LaunchConfiguration
+        DependsOn: 
+            - RootInstanceProfile
+            - Ec2SecurityGroup
+        Properties:
+            LaunchConfigurationName:  !Join [ "-" , [ !Ref Name, "LC"]]
+            AssociatePublicIpAddress: false
+            ImageId: !Ref AMIID
+            IamInstanceProfile: !Ref RootInstanceProfile
+            InstanceType: !Ref InstanceType
+            KeyName: !Ref KeyPair
+            SecurityGroups:
+            - !Ref Ec2SecurityGroup
+            UserData:
+                Fn::Base64: 
+                    !Sub |
+                        #!/bin/bash
+                        set -o xtrace
+                        wget -O- https://opscode.com/chef/install.sh | sudo bash
+                        sudo apt update
+                        sudo apt install -y git
+                        cd /home/ubuntu
+                        git clone https://github.com/vmanitripathi/elasticsearch_dk.git -b develop
+                        cd elasticsearch_dk/chef-repo
+                        sudo chef-solo -c /home/ubuntu/elasticsearch_dk/chef-repo/solo.rb -j /home/ubuntu/elasticsearch_dk/chef-repo/install_es.rb --chef-license accept
+                        /opt/aws/bin/cfn-signal --exit-code $? --stack  ${AWS::StackName} --resource AutoScalingGroup  --region ${AWS::Region}
+
+    ELB:
+        Type: AWS::ElasticLoadBalancing::LoadBalancer
+        DependsOn:
+          - ELBSecurityGroup
+        Properties:
+            Scheme: internet-facing
+            LoadBalancerName: !Join [ "-" , [ !Ref Name, "ELB"]]
+            SecurityGroups:
+            - !Ref ELBSecurityGroup
+            Subnets: !Split [',', !Join [',', !Ref PublicSubnets]]
+            Listeners:
+            - LoadBalancerPort: '9200'
+              InstancePort: '9200'
+              Protocol: TCP
+              InstanceProtocol: TCP 
+            HealthCheck:
+                Target: TCP:9200
+                HealthyThreshold: 2 
+                Interval: 45
+                Timeout: 30
+                UnhealthyThreshold: 5
+
+    AutoScalingGroup: 
+        Type: AWS::AutoScaling::AutoScalingGroup
+        DependsOn: 
+        - ELB
+        - LaunchConfiguration
+        Properties:
+            AutoScalingGroupName: !Join [ "-" , [ !Ref Name, "ASG"]]
+            DesiredCapacity: !Ref DesiredCapacity
+            LaunchConfigurationName: !Ref LaunchConfiguration
+            LoadBalancerNames:
+            - !Ref ELB
+            MaxSize: !Ref MaximumCapacity
+            MinSize: !Ref MinimumCapacity
+            VPCZoneIdentifier: !Split [',', !Join [',', !Ref ApplicationSubnets]]
+            Tags: 
+            - Key: "Name"
+              Value: !Join [ "-" , [ !Ref Name, "EC2"]]
+              PropagateAtLaunch: 'true'
+            - Key: "Version"
+              Value: !Ref Version
+              PropagateAtLaunch: 'true'
+            - Key: "OwnersEmail"
+              Value: !Ref OwnersEmail
+              PropagateAtLaunch: 'true'
+
+Outputs:
+    Loadbalancer:
+        Description: Ghost Booking Recon Services Load Balancer
+        Value: !GetAtt ELB.DNSName
+        Export:
+            Name: 
+                Fn::Sub: "${AWS::StackName}-LoadBalancer"
